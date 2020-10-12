@@ -1,6 +1,3 @@
-// edge case : empty line, word > 80, weird paragragp structure
-
-
 const express = require('express')
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser')
@@ -10,21 +7,13 @@ const { justifyText } = require('./tools.js')
 
 const VERY_VERY_SECRET_KEY = 'notSoSecret'
 const MAX_DAILY_WORDS = 80000
-//  80 000 mots par token par jour sinon renvoyer 402
+const MILLISEC_DAY = 24 * 3600 * 1000
+let users = new Map()
 
 app.use(bodyParser.text()) // To parse text request
 app.use(bodyParser.json())
-
 app.listen(3000)
 console.log('app listening')
-
-let users = new Map()
-
-users.set('sylvain', {wordsCount: 5})
-console.log(users.has('sylvain'))
-console.log(users.has('julien'))
-console.log(users.get('sylvain'))
-console.log(users.get('julien'))
 
 
 const authenticateJWT = (request, response, next) => {
@@ -33,57 +22,65 @@ const authenticateJWT = (request, response, next) => {
     let token = authorizationHeader.split(' ')[1] // [0] is 'bearer', [1] is token
     jwt.verify(token, VERY_VERY_SECRET_KEY, (err, decoded) => {
       if (err) {
+        console.log('bad token')
         return response.sendStatus(403)
       }
-      request.email = decoded.userMail
+      console.log('valid token')
+      request.email = decoded.email
       next()
     })
   } else {
-    response.sendStatus(401)
+    console.log('no authorization header found')
+    return response.sendStatus(401)
   }
 }
 
-const checkWordsLimit = (req, res, next) => {
-  console.log('oui')
-  console.log(req.email)
+const checkWordsLimit = (request, response, next) => {
+  if (!request.is('text/plain')) {
+    return response.sendStatus(400)
+  }
+  let textToJustify = request.body
+  let userLastDayRequests = users.get(request.email).callsHistory.filter(request => request.timestamp + MILLISEC_DAY > Date.now())
+  let nbWords = textToJustify.split(' ').filter(word => word !== '').length
+  let lastDayNbWords = userLastDayRequests.reduce((acc, request) => request.nbWords + acc, 0)
+
+  if (nbWords + lastDayNbWords > MAX_DAILY_WORDS) {
+    console.log('Daily limit reached')
+    return response.sendStatus(402)
+  }
+
+  users.get(request.email).callsHistory.push({timestamp: Date.now(), nbWords: nbWords})
   next()
 }
 
 app.post('/justify', authenticateJWT, checkWordsLimit, (request, response) => {
-  console.log(request.headers)
-  console.log(request.email)
-  if (!request.is('text/plain')) {
-    response.sendStatus(400)
-  } else {
-    let text = request.body
-    console.log(text)
-    let justifiedText = justifyText(text)
-    response.send(justifiedText)
-  }
+  let text = request.body
+  let justifiedText = justifyText(text)
+  response.send(justifiedText)
 })
 
-
-
 app.post('/token', (request, response) => {
-  console.log(request.body)
-  let {nom, prenom} = request.body
-  console.log(nom, prenom)
+  let email = request.body.email
+  if (!email) {
+    console.log('no email found')
+    return response.sendStatus(400)
+  }
+  let token = jwt.sign({email: email}, VERY_VERY_SECRET_KEY)
 
-  let token = jwt.sign({userMail:"name"}, VERY_VERY_SECRET_KEY)
-
-  let v1 = jwt.verify(token, VERY_VERY_SECRET_KEY)
-  let v2 = jwt.verify(token, VERY_VERY_SECRET_KEY)
-  console.log(v1)
-  console.log(v2)
+  if (users.has(email)) {
+    console.log('user already registered')
+  } else {
+    users.set(email, {callsHistory: []}) // Add a new user recognized by his token
+  }
   response.send(token)
 })
 
 
 
 
-// curl -i -H "Content-Type: application/json" --data '{"nom": "sene", "prenom": "sylvain"}' localhost:3000/token
+// curl -i -H "Content-Type: application/json" --data '{"email": "youhou@hotmail.com"}' localhost:3000/token
 
-// curl -i -H "Content-Type: text/plain" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyTWFpbCI6Im5hbWUiLCJpYXQiOjE2MDI0NTgxMDZ9.kbuRHIdRZ4oWKwrxNKvXqyXg29I1tx0mletL7pv5jCA" --data "Longtemps, je me suis couché d" localhost:3000/justify
+// curl -i -H "Content-Type: text/plain" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InlvdWhvdUBob3RtYWlsLmNvbSIsImlhdCI6MTYwMjUzMzgyNH0.CAvOIcGXTJUYXCVVFBgqyshX6DW1Wpi1u6gyWh2Bypw" --data "Longtemps, je me suis couché d" localhost:3000/justify
 
 // curl -i -H "Content-Type: text/plain" --data "Longtemps, je me suis couché de bonne heure. Parfois, à peine ma bougie éteinte, mes yeux se fermaient si vite que je n’avais pas le temps de me dire: «Je m’endors.» Et, une demi-heure après, la pensée qu’il était temps de chercher le sommeil m’éveillait; je voulais poser le volume que je croyais avoir dans les mains et souffler ma lumière; je n’avais pas cessé en dormant de faire des réflexions sur ce que je venais de lire, mais ces réflexions avaient pris un tour un peu particulier; il me semblait que j’étais moi-même ce dont parlait l’ouvrage: une église, un quatuor, la rivalité de François Ier et de Charles-Quint.
 //

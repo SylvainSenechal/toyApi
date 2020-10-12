@@ -1,4 +1,6 @@
 // TODO: verifier double \n et les curl vs text
+// edge case : empty line, word > 80, weird paragragp structure
+
 const justifyText = (text, neededLength = 80) => {
   // First we assign each word to a line
   // Then we pad each line (except the last one) with an extra space until we get 80 characters lines
