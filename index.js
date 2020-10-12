@@ -12,7 +12,7 @@ let users = new Map()
 
 app.use(bodyParser.text()) // To parse text request
 app.use(bodyParser.json())
-app.listen(3000)
+app.listen(process.env.PORT || 3000)
 console.log('app listening')
 
 
