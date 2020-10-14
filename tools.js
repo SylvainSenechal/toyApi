@@ -89,13 +89,4 @@ const padLine = (line, neededLength) => {
   return line.join(' ')
 }
 
-// let text = `Longtemps, je me suis couché de bonne heure. Parfois, à peine ma bougie éteinte,de Charles-Quint.
-//
-// Cette croyance survivait pendant quelques secondes à mon réveil; elle ne choquait pas ma raise le bougeoir n’était plus allumé.
-// Puis elle comm la causerie récente et aux adieux sous la lampe étrangère qui le suivent encore dans le silence de la nuit, à la douceur prochaine du retour.`
-
-let text = `Longtemps, je me suis couché de bonne heure. Parfois, à peine ma bougie éteinte,de Charles-Quint.`
-
-console.log(justifyText(text))
-
 module.exports = { justifyText }
